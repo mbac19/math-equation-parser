@@ -1,4 +1,4 @@
-import { assert } from "./error_utils";
+import { assert, MathSyntaxError } from "./error_utils";
 import {
   BinaryOperator,
   FunctionOperator,
@@ -8,22 +8,26 @@ import {
 } from "./operator";
 import { CoreOperators } from "./core_operators";
 import { DefaultParserDef, ParserDef } from "./parser_def";
-import { getArity } from "./get_arity";
 import {
   getLiteralClaimToken,
   getOperatorClaimToken,
   getVariableClaimToken,
 } from "./get_claim_token";
-import { makeLiteralNode, MathASTNode } from "./math_ast";
-import { OperatorProcessor } from "./operator_processor";
+import { MathASTNode } from "./math_ast";
+import { CloseSymbol, OperatorProcessor } from "./operator_processor";
+import { makeVariableNode } from ".";
 
-const UnaryMinusPayload: UnaryOperator = {
+/**
+ * The unary minus operator is a special operator. We keep it separate from
+ * other operators and the parser will need to reference it directly.
+ */
+const UnaryMinusOperator: UnaryOperator = {
   type: OperatorType.Unary,
   name: "Minus",
   symbol: "-",
 };
 
-export default class Parser {
+export class Parser {
   private readonly def: ParserDef;
 
   private readonly unaryOperators: Array<UnaryOperator>;
@@ -96,8 +100,9 @@ export default class Parser {
 
       if (literalClaimToken !== undefined) {
         // Encountered a literal.
-        const value = parseFloat(literalClaimToken.claim);
-        const literal = makeLiteralNode(value);
+        // TODO: Would like to eventually support other number formats, such
+        // as scientific notation.
+        const literal = parseFloat(literalClaimToken.claim);
         processor.addLiteral(literal);
         textToProcess = literalClaimToken.remainder;
         continue;
@@ -111,84 +116,102 @@ export default class Parser {
 
       // Check if this is a end parenthesis or comma
       if (textToProcess.charAt(0) === ")" || textToProcess.charAt(0) === ",") {
-        const closeVariable = textToProcess.charAt(0);
-        processor.addCloseVariable(closeVariable);
+        const closeSymbol = textToProcess.charAt(0) as CloseSymbol;
+        processor.addCloseSymbol(closeSymbol);
         textToProcess = textToProcess.slice(1);
         continue;
       }
 
       // Check if this is a unary operator.
       let isUnaryOperator = false;
-      for (let payload of this._unaryPayloads) {
-        const claimToken = getClaimToken(payload, textToProcess);
-        if (claimToken.claim.length > 0) {
+
+      for (const operator of this.unaryOperators) {
+        const claimToken = getOperatorClaimToken(operator, textToProcess);
+
+        if (claimToken !== undefined) {
           isUnaryOperator = true;
-          processor.addPayload(payload);
+          processor.addOperator(operator);
           textToProcess = claimToken.remainder;
-          break;
+          break; // break out of the inner for loop
         }
       }
+
       if (isUnaryOperator) {
         continue;
       }
 
       // Check for the unary minus operator.
-      const unaryMinusClaimToken = getClaimToken(
-        UnaryMinusPayload,
+      const unaryMinusClaimToken = getOperatorClaimToken(
+        UnaryMinusOperator,
         textToProcess
       );
-      if (unaryMinusClaimToken.claim.length > 0 && processor.isUnaryMinus()) {
-        processor.addPayload(UnaryMinusPayload);
+
+      if (
+        unaryMinusClaimToken !== undefined &&
+        processor.shouldProcessMinusAsUnary()
+      ) {
+        processor.addOperator(UnaryMinusOperator);
         textToProcess = unaryMinusClaimToken.remainder;
         continue;
       }
 
       // Check if this is a binary operator.
       let isBinaryOperator = false;
-      for (let payload of this._binaryPayloads) {
-        const claimToken = getClaimToken(payload, textToProcess);
-        if (claimToken.claim.length > 0) {
-          isBinaryOperator = true;
-          processor.addPayload(payload);
+
+      for (const operator of this.binaryOperators) {
+        const claimToken = getOperatorClaimToken(operator, textToProcess);
+
+        if (claimToken !== undefined) {
+          processor.addOperator(operator);
           textToProcess = claimToken.remainder;
-          break;
+          break; // break out of inner for loop.
         }
       }
+
       if (isBinaryOperator) {
         continue;
       }
 
       // Check if this is a function operator
       let isFunctionOperator = false;
-      for (let payload of this._functionPayloads) {
-        const claimToken = getClaimToken(payload, textToProcess);
-        if (claimToken.claim.length > 0) {
+
+      for (const operator of this.functionOperators) {
+        const claimToken = getOperatorClaimToken(operator, textToProcess);
+
+        if (claimToken !== undefined) {
           isFunctionOperator = true;
-          processor.addPayload(payload);
-          assert(
-            claimToken.remainder.charAt(0) === "(", // Paren after function
-            "Invalid Equation"
-          );
+          processor.addOperator(operator);
+
+          if (claimToken.remainder.charAt(0) !== "(") {
+            throw new MathSyntaxError("Expected '(' after function operator");
+          }
+
           textToProcess = claimToken.remainder.slice(1);
-          break;
+          break; // break out of inner for loop
         }
       }
+
       if (isFunctionOperator) {
         continue;
       }
 
       // Check if this is a variable.
-      const variableClaimToken = getClaimToken(VariablePayload, textToProcess);
-      if (variableClaimToken.claim.length > 0) {
-        const rawVariable = variableClaimToken.claim;
-        const variable = createOperator(VariablePayload, [rawVariable]);
+      const variableClaimToken = getVariableClaimToken(
+        this.def.validVariables,
+        textToProcess
+      );
+
+      if (variableClaimToken !== undefined) {
+        const variable = variableClaimToken.claim;
+        const node = makeVariableNode(variable);
         processor.addVariable(variable);
         textToProcess = variableClaimToken.remainder;
         continue;
       }
 
-      assert(false, `Unexpected token: ${textToProcess.charAt(0)}`);
+      throw new MathSyntaxError(`Unexpected token: ${textToProcess.charAt(0)}`);
     }
+
     return processor.done();
   }
 }

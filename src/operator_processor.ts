@@ -1,31 +1,70 @@
-import { assert } from "./error_utils";
+import { assert, IncorrectArityError, MathSyntaxError } from "./error_utils";
 import {
   BinaryOperator,
+  FunctionOperator,
   Operator,
   OperatorPrecedenceMap,
   OperatorType,
   UnaryOperator,
 } from "./operator";
-import { LiteralMathASTNode, MathASTNodeType } from "./math_ast";
+import { CoreOperators } from "./core_operators";
+import { getArity } from "./get_arity";
+import {
+  Literal,
+  makeLiteralNode,
+  makeOperatorNode,
+  makeVariableNode,
+  MathASTNodeType,
+  Variable,
+} from "./math_ast";
+import { MathASTNode } from "./math_ast";
 import { ParserDef } from "./parser_def";
 
 export type CloseSymbol = "," | ")";
 
+export type OpenSymbol = "(";
+
+export type TokenType = MathASTNodeType | OpenSymbol | CloseSymbol;
+
 /**
- * A utility class that helps process adding operators.
+ * A utility class that helps process adding operators. The processor works by
+ * handling one token at a time and managing the state for the entire equation.
+ * The parser provides one token per pass to the processor and the processor
+ * continues to parse the math equation.
  */
 export class OperatorProcessor {
+  /**
+   * The number of operands that the operator at the top of the stack
+   * is expecting.
+   */
   private remainingFunctionOperands: number = 0;
 
-  private typeAddedCurrentPass: MathASTNodeType | CloseSymbol | undefined;
+  /**
+   * We keep track of the type of token on the current pass.
+   */
+  private typeAddedCurrentPass: TokenType | undefined;
 
-  private typeAddedLastPass: MathASTNodeType | CloseSymbol | undefined;
+  /**
+   * We keep track of the token on the previous pass.
+   */
+  private typeAddedLastPass: TokenType | undefined;
 
+  /**
+   * Done parsing the math equation.
+   */
   private isDone: boolean = false;
 
-  private operators: Array<unknown> = [];
+  /**
+   * The stack of nodes that we are processing.
+   */
+  private nodes: Array<MathASTNode> = [];
 
-  private operatorStack: Array<Operator> = [];
+  /**
+   * The stack of operators that we are processing.
+   */
+  private operatorStack: Array<
+    Operator | CloseSymbol | OpenSymbol | "StartOfFunction"
+  > = [];
 
   constructor(private readonly def: ParserDef) {}
 
@@ -46,28 +85,45 @@ export class OperatorProcessor {
    * Declare that we are done processing this equation and get the resulting
    * syntax tree, if there are no errors.
    */
-  public done() {
+  public done(): MathASTNode {
     // Loop through, pop, and resolve any operators still left on the stack.
     while (this.operatorStack.length > 0) {
-      const payload = this._operatorPayloads.pop();
-      assert(
-        payload !== "(" && payload !== "StartOfFunction",
-        "Invalid equation"
-      );
-      const numberOfParams = getNumberOfParams(payload);
-      const params = this._operators.splice(-numberOfParams, numberOfParams);
-      assert.equal(params.length, numberOfParams);
-      this._operators.push(createOperator(payload, params));
+      const operator = this.operatorStack.pop();
+
+      if (!isOperator(operator)) {
+        throw new MathSyntaxError();
+      }
+
+      const arity = getArity(operator);
+
+      const params = this.nodes.splice(-arity, arity);
+
+      if (params.length !== arity) {
+        throw new IncorrectArityError();
+      }
+
+      this.nodes.push(makeOperatorNode(operator, params));
     }
-    assert(this._operators.length === 1, "Invalid equation");
-    return this._operators[0];
+
+    if (this.nodes.length !== 1) {
+      throw new MathSyntaxError("Invalid equation");
+    }
+
+    return this.nodes[0];
   }
 
   // ---------------------------------------------------------------------------
   // PUBLIC API
   // ---------------------------------------------------------------------------
 
-  public isUnaryMinus() {
+  /**
+   * If we encounter a minus sign, we need to decide whether the minus sign
+   * represents a binary subtract or a unary negate. The processor holds the
+   * state of the current math equation parsing, so if the parser encounters
+   * a minus sign, it can query the processor as to whether the minus should
+   * be unary or binary.
+   */
+  public shouldProcessMinusAsUnary() {
     return (
       this.typeAddedLastPass !== MathASTNodeType.Literal &&
       this.typeAddedLastPass !== ")"
@@ -78,16 +134,16 @@ export class OperatorProcessor {
   // PUBLIC PROCESSORS
   // ---------------------------------------------------------------------------
 
-  public addVariable(variable: string) {
+  public addVariable(variable: Variable) {
     this.typeAddedCurrentPass = MathASTNodeType.Variable;
-    this._maybeImplicitMultiply();
-    this._addOperator(variable);
+    this.maybeImplicitMultiply();
+    this.nodes.push(makeVariableNode(variable));
   }
 
-  public addLiteral(literal: LiteralMathASTNode) {
+  public addLiteral(literal: Literal) {
     this.typeAddedCurrentPass = MathASTNodeType.Literal;
-    this._maybeImplicitMultiply();
-    this._addOperator(literal);
+    this.maybeImplicitMultiply();
+    this.nodes.push(makeLiteralNode(literal));
   }
 
   public addOperator(operator: Operator) {
@@ -106,13 +162,79 @@ export class OperatorProcessor {
     }
   }
 
+  public addOpenParens() {
+    this.typeAddedCurrentPass = "(";
+    this.maybeImplicitMultiply();
+    this.operatorStack.push("(");
+  }
+
+  /**
+   * The close symbol in the math equation means we've reach the end of some
+   * expression (i.e. "," or ")")
+   */
+  public addCloseSymbol(closeSymbol: CloseSymbol) {
+    this.typeAddedCurrentPass = closeSymbol;
+
+    this.maybeImplicitMultiply();
+
+    const isComma = closeSymbol === ",";
+
+    if (isComma) {
+      this.remainingFunctionOperands -= 1;
+    }
+
+    // Continuously pop until reaching the corresponding parenthesis.
+    let operator = this.operatorStack.pop();
+
+    while (operator !== undefined && isOperator(operator)) {
+      const arity = getArity(operator);
+
+      const params = this.nodes.splice(-arity, arity);
+
+      const operatorName = operator.name;
+
+      if (params.length !== arity) {
+        throw new IncorrectArityError();
+      }
+
+      this.nodes.push(makeOperatorNode(operator, params));
+
+      operator = this.operatorStack.pop();
+    }
+
+    if (operator === "StartOfFunction" && !isComma) {
+      // We processed everything from the start to the end of the function,
+      // need to finish off processing this function call.
+
+      // We encountered 1 more operand in this pass of textToProcess.
+      this.remainingFunctionOperands -= 1;
+
+      // StartOfFunction is always preceded by its FunctionOperator
+      const functionOperator = this.operatorStack.pop();
+
+      if (!isFunctionOperator(functionOperator)) {
+        throw new MathSyntaxError();
+      }
+
+      const arity = getArity(functionOperator);
+
+      const params = this.nodes.splice(-arity, arity);
+
+      if (params.length !== arity) {
+        throw new IncorrectArityError();
+      }
+
+      this.nodes.push(makeOperatorNode(functionOperator, params));
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // PRIVATE HELPERS
   // ---------------------------------------------------------------------------
 
   private addUnaryOperator(operator: UnaryOperator) {
     this.typeAddedCurrentPass = MathASTNodeType.UnaryOperator;
-    this._maybeImplicitMultiply();
+    this.maybeImplicitMultiply();
     this.operatorStack.push(operator);
   }
 
@@ -126,117 +248,62 @@ export class OperatorProcessor {
       this.typeAddedCurrentPass = MathASTNodeType.BinaryOperator;
     }
 
-    const precedenceValue = getPrecedenceValue(payload);
+    const precedenceValue = getPrecedenceValue(operator);
 
-    let lastPayload = this._operatorPayloads[this._operatorPayloads.length - 1];
+    // Peek at the last operator on the stack.
+    let lastOperator = this.operatorStack[this.operatorStack.length - 1];
+
     while (
-      lastPayload &&
-      lastPayload !== "(" &&
-      lastPayload !== "StartOfFunction" &&
+      lastOperator !== undefined &&
+      isOperator(lastOperator) &&
       // Left Associative
-      ((this._config.isLeftAssociative &&
-        getPrecedenceValue(lastPayload) >= precedenceValue) ||
+      ((this.def.isLeftAssociative &&
+        getPrecedenceValue(lastOperator) >= precedenceValue) ||
         // Right Associative
-        getPrecedenceValue(lastPayload) > precedenceValue)
+        getPrecedenceValue(lastOperator) > precedenceValue)
     ) {
-      this._operatorPayloads.pop();
-      const numberOfParams = getNumberOfParams(lastPayload);
-      const params = this._operators.splice(-numberOfParams, numberOfParams);
-      const operator = createOperator(lastPayload, params);
-      this._operators.push(operator);
-      lastPayload = this._operatorPayloads[this._operatorPayloads.length - 1];
+      this.operatorStack.pop();
+      const arity = getArity(lastOperator);
+      const params = this.nodes.splice(-arity, arity);
+      const node = makeOperatorNode(lastOperator, params);
+      this.nodes.push(node);
+
+      // Peek at the last operator on the stack.
+      lastOperator = this.operatorStack[this.operatorStack.length - 1];
     }
-    this._operatorPayloads.push(payload);
+
+    this.operatorStack.push();
   }
 
-  _addFunctionPayload(payload) {
-    this._typeAddedCurrentPass = "FunctionOperator";
-    this._maybeImplicitMultiply();
-    this._operatorPayloads.push(payload, "StartOfFunction");
-    this._remainingFunctionOperands = getNumberOfParams(payload);
+  private addFunctionOperator(operator: FunctionOperator) {
+    this.typeAddedCurrentPass = MathASTNodeType.FunctionOperator;
+    this.maybeImplicitMultiply();
+    this.operatorStack.push(operator, "StartOfFunction");
+    this.remainingFunctionOperands = getArity(operator);
   }
 
-  public addOpenParens() {
-    this._typeAddedCurrentPass = "(";
-    this._maybeImplicitMultiply();
-    this._operatorPayloads.push("(");
-  }
-
-  /**
-   * The close symbol in the math equation means we've reach the end of some
-   * expression (i.e. "," or ")")
-   */
-  public addCloseSymbol(closeSymbol: CloseSymbol) {
-    this.typeAddedCurrentPass = closeSymbol;
-
-    this._maybeImplicitMultiply();
-    const isComma = commaOrCloseParens === ",";
-    if (isComma) {
-      this._remainingFunctionOperands -= 1;
-    }
-    // Continuously pop until reaching the corresponding parenthesis.
-    let operatorPayload = this._operatorPayloads.pop();
-    while (
-      operatorPayload &&
-      operatorPayload !== "(" &&
-      operatorPayload !== "StartOfFunction"
-    ) {
-      const numberOfParams = getNumberOfParams(operatorPayload);
-      const params = this._operators.splice(-numberOfParams, numberOfParams);
-      const operatorName = operatorPayload.name;
-      assert(
-        params.length === numberOfParams,
-        `Operator ${operatorName} needs ${numberOfParams} params`
-      );
-      this._operators.push(createOperator(operatorPayload, params));
-      this._addedOperatorCurrentPass = true;
-      operatorPayload = this._operatorPayloads.pop();
-    }
-    if (operatorPayload === "StartOfFunction" && !isComma) {
-      // We processed everything from the start to the end of the function,
-      // need to finish off processing this function call.
-
-      // We encountered 1 more operand in this pass of textToProcess.
-      this._remainingFunctionOperands -= 1;
-
-      // StartOfFunction is always preceded by its FunctionOperator
-      const functionPayload = this._operatorPayloads.pop();
-      const numberOfFunctionParams = getNumberOfParams(functionPayload);
-      assert.equal(functionPayload.type, "FunctionOperator");
-      const params = this._operators.splice(
-        -numberOfFunctionParams,
-        numberOfFunctionParams
-      );
-      assert(
-        params.length === numberOfFunctionParams,
-        "Corrupt state: Not enough elements in resolvedOperators"
-      );
-      this._operators.push(createOperator(functionPayload, params));
-    }
-  }
-
-  _maybeImplicitMultiply() {
-    // Check for implicit multiplication.
-    const leftTypes = [")", "Literal", "Variable"];
-    const rightTypes = [
-      "UnaryOperator",
-      "FunctionOperator",
-      "(",
-      "Literal",
-      "Variable",
+  private maybeImplicitMultiply() {
+    const leftTypes: Array<TokenType | undefined> = [
+      ")",
+      MathASTNodeType.Variable,
+      MathASTNodeType.Literal,
     ];
-    if (
-      this._config.implicitMultiply &&
-      leftTypes.indexOf(this._typeAddedLastPass) >= 0 &&
-      rightTypes.indexOf(this._typeAddedCurrentPass) >= 0
-    ) {
-      this._addBinaryPayload(CoreOperators.Binary.prod, true);
-    }
-  }
 
-  _addOperator(operator) {
-    this._operators.push(operator);
-    this._addedOperatorCurrentPass = true;
+    const rightTypes: Array<TokenType | undefined> = [
+      "(",
+      MathASTNodeType.UnaryOperator,
+      MathASTNodeType.FunctionOperator,
+      MathASTNodeType.Literal,
+      MathASTNodeType.Variable,
+    ];
+
+    if (
+      this.def.implicitMultiply &&
+      leftTypes.indexOf(this.typeAddedLastPass) >= 0 &&
+      rightTypes.indexOf(this.typeAddedCurrentPass) >= 0
+    ) {
+      this.addBinaryOperator(CoreOperators.prod as BinaryOperator, true);
+    }
   }
 }
 
@@ -266,4 +333,18 @@ function getPrecedenceValue(operator: Operator): number {
         `getPrecedenceValue has unhandled operator type: ${operator.type}`
       );
   }
+}
+
+function isCloseSymbol<T>(val: T | CloseSymbol): val is CloseSymbol {
+  return val === ")" || val === ",";
+}
+
+function isOperator<T>(val: T | Operator): val is Operator {
+  // @ts-ignore
+  return "type" in val && Object.keys(OperatorType).includes(val.type);
+}
+
+function isFunctionOperator(val: unknown | undefined): val is FunctionOperator {
+  // @ts-ignore
+  return Boolean(val) && "type" in val && val.type === OperatorType.Function;
 }

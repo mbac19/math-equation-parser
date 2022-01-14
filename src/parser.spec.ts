@@ -1,4 +1,4 @@
-import Parser from "../parser";
+import { Parser } from "./parser";
 
 function Literal(value) {
   return { type: "Literal", name: "Literal", value };

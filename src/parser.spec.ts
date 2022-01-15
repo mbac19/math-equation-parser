@@ -1,5 +1,4 @@
 import { CoreOperators } from "./core_operators";
-import { OperatorType } from "./operator";
 import {
   makeLiteralNode,
   makeOperatorNode,
@@ -157,80 +156,83 @@ describe("Parser", () => {
     expect(() => parser.parse("tan(x + z)")).toThrow();
   });
 
-  // describe("implicit multiply", () => {
-  //   it("works between variable and literal", () => {
-  //     expect(Parser.parse("3x")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(3),
-  //       right: makeVariableNode("x"),
-  //     });
-  //     expect(Parser.parse("x3")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeVariableNode("x"),
-  //       right: makeLiteralNode(3),
-  //     });
-  //   });
-  //   it("works between variable and variable", () => {
-  //     expect(Parser.parse("xy")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeVariableNode("x"),
-  //       right: makeVariableNode("y"),
-  //     });
-  //   });
-  //   it("works between complex operations", () => {
-  //     expect(Parser.parse("x^2y^2")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: {
-  //         type: OperatorType.Binary,
-  //         name: "Exponent",
-  //         left: makeVariableNode("x"),
-  //         right: makeLiteralNode(2),
-  //       },
-  //       right: {
-  //         type: OperatorType.Binary,
-  //         name: "Exponent",
-  //         left: makeVariableNode("y"),
-  //         right: makeLiteralNode(2),
-  //       },
-  //     });
-  //   });
-  //   it("works with parenthesis", () => {
-  //     expect(Parser.parse("(1)(2)")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     });
-  //     expect(Parser.parse("1(2)")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     });
-  //     expect(Parser.parse("(1)2")).toEqual({
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     });
-  //   });
-  //   it("works with function operators", () => {
-  //     expect(Parser.parse("xsin(y)")).toEqual({
-  //       type: "BinaryOperator",
-  //       name: "Product",
-  //       left: makeVariableNode("x"),
-  //       right: {
-  //         type: "FunctionOperator",
-  //         name: "Sine",
-  //         params: [makeVariableNode("y")],
-  //       },
-  //     });
-  //   });
-  // });
+  describe("implicit multiply", () => {
+    it("works between variable and literal", () => {
+      expect(Parser.parse("3x")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(3),
+          makeVariableNode("x"),
+        ])
+      );
+
+      expect(Parser.parse("x3")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeVariableNode("x"),
+          makeLiteralNode(3),
+        ])
+      );
+    });
+
+    it("works between variable and variable", () => {
+      expect(Parser.parse("xy")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeVariableNode("x"),
+          makeVariableNode("y"),
+        ])
+      );
+    });
+
+    it("works between complex operations", () => {
+      expect(Parser.parse("x^2y^2")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeOperatorNode(CoreOperators.exp, [
+            makeVariableNode("x"),
+            makeLiteralNode(2),
+          ]),
+          makeOperatorNode(CoreOperators.exp, [
+            makeVariableNode("y"),
+            makeLiteralNode(2),
+          ]),
+        ])
+      );
+    });
+
+    it("works with parenthesis", () => {
+      expect(Parser.parse("(1)(2)")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ])
+      );
+
+      expect(Parser.parse("1(2)")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ])
+      );
+
+      expect(Parser.parse("(1)2")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ])
+      );
+    });
+
+    //   it("works with function operators", () => {
+    //     expect(Parser.parse("xsin(y)")).toEqual({
+    //       type: "BinaryOperator",
+    //       name: "Product",
+    //       left: makeVariableNode("x"),
+    //       right: {
+    //         type: "FunctionOperator",
+    //         name: "Sine",
+    //         params: [makeVariableNode("y")],
+    //       },
+    //     });
+    //   });
+  });
   // it("configures to disable implicit multiply", () => {
   //   const parser = new Parser({ implicitMultiply: false });
   //   expect(() => parser.parse("xy")).toThrow();

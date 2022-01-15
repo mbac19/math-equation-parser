@@ -4,6 +4,7 @@ import {
   makeOperatorNode,
   makeVariableNode,
 } from "./math_ast";
+import { Operator, OperatorType } from "./operator";
 import { Parser } from "./parser";
 
 describe("Parser", () => {
@@ -220,50 +221,50 @@ describe("Parser", () => {
       );
     });
 
-    //   it("works with function operators", () => {
-    //     expect(Parser.parse("xsin(y)")).toEqual({
-    //       type: "BinaryOperator",
-    //       name: "Product",
-    //       left: makeVariableNode("x"),
-    //       right: {
-    //         type: "FunctionOperator",
-    //         name: "Sine",
-    //         params: [makeVariableNode("y")],
-    //       },
-    //     });
-    //   });
+    it("works with function operators", () => {
+      expect(Parser.parse("xsin(y)")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeVariableNode("x"),
+          makeOperatorNode(CoreOperators.sin, [makeVariableNode("y")]),
+        ])
+      );
+    });
   });
-  // it("configures to disable implicit multiply", () => {
-  //   const parser = new Parser({ implicitMultiply: false });
-  //   expect(() => parser.parse("xy")).toThrow();
-  // });
-  // it("configures to calculate with right associativity", () => {
-  //   const parser = new Parser({ isLeftAssociative: false });
-  //   expect(parser.parse("1 + 2 + 3")).toEqual({
-  //     type: "BinaryOperator",
-  //     name: "Sum",
-  //     left: makeLiteralNode(1),
-  //     right: {
-  //       type: "BinaryOperator",
-  //       name: "Sum",
-  //       left: makeLiteralNode(2),
-  //       right: makeLiteralNode(3),
-  //     },
-  //   });
-  // });
-  // it("supports custom unary operators", () => {
-  //   const parser = new Parser();
-  //   parser.addOperator({
-  //     type: OperatorType.Unary,
-  //     name: "Blah",
-  //     symbol: "$",
-  //   });
-  //   expect(parser.parse("$1")).toEqual({
-  //     type: OperatorType.Unary,
-  //     name: "Blah",
-  //     param: makeLiteralNode(1),
-  //   });
-  // });
+
+  it("configures to disable implicit multiply", () => {
+    const parser = new Parser({ implicitMultiply: false });
+    expect(() => parser.parse("xy")).toThrow();
+  });
+
+  it("configures to calculate with right associativity", () => {
+    const parser = new Parser({ isLeftAssociative: false });
+
+    expect(parser.parse("1 + 2 + 3")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeLiteralNode(1),
+        makeOperatorNode(CoreOperators.sum, [
+          makeLiteralNode(2),
+          makeLiteralNode(3),
+        ]),
+      ])
+    );
+  });
+
+  it("supports custom unary operators", () => {
+    const parser = new Parser();
+    const $: Operator = {
+      type: OperatorType.Unary,
+      name: "Blah",
+      symbol: "$",
+    };
+
+    parser.addOperator($);
+
+    expect(parser.parse("$1")).toEqual(
+      makeOperatorNode($, [makeLiteralNode(1)])
+    );
+  });
+
   // describe("Unary Operators", () => {
   //   it("parses with parenthesis", () => {
   //     const parser = new Parser();

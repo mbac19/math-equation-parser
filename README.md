@@ -23,8 +23,6 @@ A library for parsing math equations in Javascript.
 
 ## Basic Usage
 
-##### ES6 Imports
-
 ```typescript
 import Parser from "math-equation-parser";
 
@@ -49,12 +47,3 @@ console.log(Parser.parse("1 + 2"));
   }
 }
 ```
-
-## Contributing to Project
-
-Please do the following with any pull request:
-
-- Run the unit tests: `npm run test`
-- Rebuild the code `npm run build`
-- Add unit tests for any features you added
-- Thanks in advance for contributing!

@@ -8,64 +8,69 @@ import {
 import { Parser } from "./parser";
 
 describe("Parser", () => {
-  // it("parses number literals", () => {
-  //   expect(Parser.parse("2")).toEqual(makeLiteralNode(2));
-  //   expect(Parser.parse("1.12")).toEqual(makeLiteralNode(1.12));
-  //   expect(Parser.parse(".12")).toEqual(makeLiteralNode(0.12));
-  // });
-  // it("parses the sum operation", () => {
-  //   expect(Parser.parse("2 + 3")).toEqual(
-  //     makeOperatorNode(CoreOperators.sum, [
-  //       makeLiteralNode(2),
-  //       makeLiteralNode(3),
-  //     ])
-  //   );
-  // });
-  // it("parses the minus operator", () => {
-  //   expect(Parser.parse("2 - 3")).toEqual(
-  //     makeOperatorNode(CoreOperators.diff, [
-  //       makeLiteralNode(2),
-  //       makeLiteralNode(3),
-  //     ])
-  //   );
-  // });
-  // it("parses assuming left associativity", () => {
-  //   expect(Parser.parse("1 + 2 + 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: {
-  //       type: OperatorType.Binary,
-  //       name: "Sum",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     },
-  //     right: makeLiteralNode(3),
-  //   });
-  // });
-  // it("parses the multiplication operator", () => {
-  //   expect(Parser.parse("2 * 3.1")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Product",
-  //     left: makeLiteralNode(2),
-  //     right: makeLiteralNode(3.1),
-  //   });
-  // });
-  // it("parses the division operator", () => {
-  //   expect(Parser.parse(".12 / .48")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Quotient",
-  //     left: makeLiteralNode(0.12),
-  //     right: makeLiteralNode(0.48),
-  //   });
-  // });
-  // it("parses the exponent operator", () => {
-  //   expect(Parser.parse("1.1 ^ 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Exponent",
-  //     left: makeLiteralNode(1.1),
-  //     right: makeLiteralNode(3),
-  //   });
-  // });
+  it("parses number literals", () => {
+    expect(Parser.parse("2")).toEqual(makeLiteralNode(2));
+    expect(Parser.parse("1.12")).toEqual(makeLiteralNode(1.12));
+    expect(Parser.parse(".12")).toEqual(makeLiteralNode(0.12));
+  });
+
+  it("parses the sum operation", () => {
+    expect(Parser.parse("2 + 3")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeLiteralNode(2),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
+  it("parses the minus operator", () => {
+    expect(Parser.parse("2 - 3")).toEqual(
+      makeOperatorNode(CoreOperators.diff, [
+        makeLiteralNode(2),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
+  it("parses assuming left associativity", () => {
+    expect(Parser.parse("1 + 2 + 3")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeOperatorNode(CoreOperators.sum, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ]),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
+  it("parses the multiplication operator", () => {
+    expect(Parser.parse("2 * 3.1")).toEqual(
+      makeOperatorNode(CoreOperators.prod, [
+        makeLiteralNode(2),
+        makeLiteralNode(3.1),
+      ])
+    );
+  });
+
+  it("parses the division operator", () => {
+    expect(Parser.parse(".12 / .48")).toEqual(
+      makeOperatorNode(CoreOperators.quot, [
+        makeLiteralNode(0.12),
+        makeLiteralNode(0.48),
+      ])
+    );
+  });
+
+  it("parses the exponent operator", () => {
+    expect(Parser.parse("1.1 ^ 3")).toEqual(
+      makeOperatorNode(CoreOperators.exp, [
+        makeLiteralNode(1.1),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
   // it("gives multiplication higher precedence than addition", () => {
   //   expect(Parser.parse("1 + 2 * 3")).toEqual({
   //     type: OperatorType.Binary,

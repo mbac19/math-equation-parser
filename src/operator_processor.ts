@@ -272,7 +272,7 @@ export class OperatorProcessor {
       lastOperator = this.operatorStack[this.operatorStack.length - 1];
     }
 
-    this.operatorStack.push();
+    this.operatorStack.push(operator);
   }
 
   private addFunctionOperator(operator: FunctionOperator) {
@@ -341,7 +341,7 @@ function isCloseSymbol<T>(val: T | CloseSymbol): val is CloseSymbol {
 
 function isOperator<T>(val: T | Operator): val is Operator {
   // @ts-ignore
-  return "type" in val && Object.keys(OperatorType).includes(val.type);
+  return "type" in val && Object.values(OperatorType).includes(val.type);
 }
 
 function isFunctionOperator(val: unknown | undefined): val is FunctionOperator {

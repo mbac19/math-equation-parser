@@ -29,13 +29,6 @@ export const CoreOperators: Record<string, Operator> = {
     symbol: "log",
   },
 
-  pow: {
-    type: OperatorType.Function,
-    arity: 1,
-    name: "Exponent",
-    symbol: "pow",
-  },
-
   prod: {
     type: OperatorType.Binary,
     precedence: OperatorPrecedence.Medium,

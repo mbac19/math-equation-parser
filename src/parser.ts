@@ -92,7 +92,7 @@ export class Parser {
 
     // If we are processing a function, then we need to count the number
     // of operands we are expecting for that function.
-    while (textToProcess.length) {
+    while (textToProcess.length > 0) {
       processor.startPass();
 
       // Check if we found a number literal.
@@ -162,6 +162,7 @@ export class Parser {
         const claimToken = getOperatorClaimToken(operator, textToProcess);
 
         if (claimToken !== undefined) {
+          isBinaryOperator = true;
           processor.addOperator(operator);
           textToProcess = claimToken.remainder;
           break; // break out of inner for loop.

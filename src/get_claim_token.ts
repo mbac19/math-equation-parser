@@ -41,7 +41,7 @@ export function getVariableClaimToken(
   }
 
   if (validVariables && validVariables.indexOf(text.charAt(0)) < 0) {
-    return { claim: "", remainder: text };
+    return;
   }
   return { claim: text.charAt(0), remainder: text.slice(1) };
 }
@@ -60,7 +60,7 @@ export function getOperatorClaimToken(
       if (text.startsWith(symbol)) {
         return { claim: symbol, remainder: text.slice(symbol.length) };
       }
-      return { claim: "", remainder: text };
+      return;
     }
 
     case OperatorType.Binary: {
@@ -68,7 +68,7 @@ export function getOperatorClaimToken(
       if (text.startsWith(symbol)) {
         return { claim: symbol, remainder: text.slice(symbol.length) };
       }
-      return { claim: "", remainder: text };
+      return;
     }
 
     case OperatorType.Function: {
@@ -76,7 +76,7 @@ export function getOperatorClaimToken(
       if (text.startsWith(symbol)) {
         return { claim: symbol, remainder: text.slice(symbol.length) };
       }
-      return { claim: "", remainder: text };
+      return;
     }
   }
 }

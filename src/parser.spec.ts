@@ -71,123 +71,92 @@ describe("Parser", () => {
     );
   });
 
-  // it("gives multiplication higher precedence than addition", () => {
-  //   expect(Parser.parse("1 + 2 * 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: makeLiteralNode(1),
-  //     right: {
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(2),
-  //       right: makeLiteralNode(3),
-  //     },
-  //   });
-  //   expect(Parser.parse("1 * 2 + 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: {
-  //       type: OperatorType.Binary,
-  //       name: "Product",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     },
-  //     right: makeLiteralNode(3),
-  //   });
-  // });
-  // it("gives exponent higher precedence than multiplication", () => {
-  //   expect(Parser.parse("1 + 2 ^ 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: makeLiteralNode(1),
-  //     right: {
-  //       type: OperatorType.Binary,
-  //       name: "Exponent",
-  //       left: makeLiteralNode(2),
-  //       right: makeLiteralNode(3),
-  //     },
-  //   });
-  //   expect(Parser.parse("1 ^ 2 + 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: {
-  //       type: OperatorType.Binary,
-  //       name: "Exponent",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     },
-  //     right: makeLiteralNode(3),
-  //   });
-  // });
-  // it("parses variables", () => {
-  //   expect(Parser.parse("x")).toEqual(makeVariableNode("x"));
-  //   expect(Parser.parse("1 + x")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Sum",
-  //     left: makeLiteralNode(1),
-  //     right: makeVariableNode("x"),
-  //   });
-  // });
-  // it("parses parenthesis", () => {
-  //   expect(Parser.parse("(1)")).toEqual(makeLiteralNode(1));
-  //   expect(Parser.parse("((1))")).toEqual(makeLiteralNode(1));
-  // });
-  // it("sets precedence on operations within parenthesis", () => {
-  //   expect(Parser.parse("(1 + 2) * 3")).toEqual({
-  //     type: OperatorType.Binary,
-  //     name: "Product",
-  //     left: {
-  //       type: OperatorType.Binary,
-  //       name: "Sum",
-  //       left: makeLiteralNode(1),
-  //       right: makeLiteralNode(2),
-  //     },
-  //     right: makeLiteralNode(3),
-  //   });
-  // });
-  // it("throws an error when a binary operation is used incorrectly", () => {
-  //   expect(() => Parser.parse("1 *")).toThrow();
-  // });
-  // it("parses the log operator", () => {
-  //   expect(Parser.parse("log(1)")).toEqual({
-  //     type: OperatorType.Function,
-  //     name: "Log10",
-  //     params: [makeLiteralNode(1)],
-  //   });
-  // });
-  // it("parses the pow operator", () => {
-  //   expect(Parser.parse("pow(1, 2)")).toEqual({
-  //     type: OperatorType.Function,
-  //     name: "Exponent",
-  //     params: [makeLiteralNode(1), makeLiteralNode(2)],
-  //   });
-  // });
-  // it("parses the sin operator", () => {
-  //   expect(Parser.parse("sin(0)")).toEqual({
-  //     type: OperatorType.Function,
-  //     name: "Sine",
-  //     params: [makeLiteralNode(0)],
-  //   });
-  // });
-  // it("parses the cosin operator", () => {
-  //   expect(Parser.parse("cosin(0)")).toEqual({
-  //     type: OperatorType.Function,
-  //     name: "Cosine",
-  //     params: [makeLiteralNode(0)],
-  //   });
-  // });
-  // it("parses the tan operator", () => {
-  //   expect(Parser.parse("tan(1)")).toEqual({
-  //     type: OperatorType.Function,
-  //     name: "Tangent",
-  //     params: [makeLiteralNode(1)],
-  //   });
-  // });
-  // it("configures to only allow certain variables", () => {
-  //   const parser = new Parser({ validVariables: ["x", "y"] });
-  //   expect(() => parser.parse("tan(x + y)")).not.toThrow();
-  //   expect(() => parser.parse("tan(x + z)")).toThrow();
-  // });
+  it("gives multiplication higher precedence than addition", () => {
+    expect(Parser.parse("1 * 2 + 3")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ]),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
+  it("gives exponent higher precedence than multiplication", () => {
+    expect(Parser.parse("1 + 2 ^ 3")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeLiteralNode(1),
+        makeOperatorNode(CoreOperators.exp, [
+          makeLiteralNode(2),
+          makeLiteralNode(3),
+        ]),
+      ])
+    );
+  });
+
+  it("parses variables", () => {
+    expect(Parser.parse("x")).toEqual(makeVariableNode("x"));
+
+    expect(Parser.parse("1 + x")).toEqual(
+      makeOperatorNode(CoreOperators.sum, [
+        makeLiteralNode(1),
+        makeVariableNode("x"),
+      ])
+    );
+  });
+
+  it("parses parenthesis", () => {
+    expect(Parser.parse("(1)")).toEqual(makeLiteralNode(1));
+    expect(Parser.parse("((1))")).toEqual(makeLiteralNode(1));
+  });
+
+  it("sets precedence on operations within parenthesis", () => {
+    expect(Parser.parse("(1 + 2) * 3")).toEqual(
+      makeOperatorNode(CoreOperators.prod, [
+        makeOperatorNode(CoreOperators.sum, [
+          makeLiteralNode(1),
+          makeLiteralNode(2),
+        ]),
+        makeLiteralNode(3),
+      ])
+    );
+  });
+
+  it("throws an error when a binary operation is used incorrectly", () => {
+    expect(() => Parser.parse("1 *")).toThrow();
+  });
+
+  it("parses the log operator", () => {
+    expect(Parser.parse("log(1)")).toEqual(
+      makeOperatorNode(CoreOperators.log, [makeLiteralNode(1)])
+    );
+  });
+
+  it("parses the sin operator", () => {
+    expect(Parser.parse("sin(0)")).toEqual(
+      makeOperatorNode(CoreOperators.sin, [makeLiteralNode(0)])
+    );
+  });
+
+  it("parses the cosin operator", () => {
+    expect(Parser.parse("cosin(0)")).toEqual(
+      makeOperatorNode(CoreOperators.cosin, [makeLiteralNode(0)])
+    );
+  });
+
+  it("parses the tan operator", () => {
+    expect(Parser.parse("tan(1)")).toEqual(
+      makeOperatorNode(CoreOperators.tan, [makeLiteralNode(1)])
+    );
+  });
+
+  it("configures to only allow certain variables", () => {
+    const parser = new Parser({ validVariables: ["x", "y"] });
+    expect(() => parser.parse("tan(x + y)")).not.toThrow();
+    expect(() => parser.parse("tan(x + z)")).toThrow();
+  });
+
   // describe("implicit multiply", () => {
   //   it("works between variable and literal", () => {
   //     expect(Parser.parse("3x")).toEqual({

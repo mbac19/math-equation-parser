@@ -340,11 +340,21 @@ function isCloseSymbol<T>(val: T | CloseSymbol): val is CloseSymbol {
 }
 
 function isOperator<T>(val: T | Operator): val is Operator {
-  // @ts-ignore
-  return "type" in val && Object.values(OperatorType).includes(val.type);
+  return (
+    Boolean(val) &&
+    typeof val === "object" &&
+    "type" in val &&
+    Object.values(OperatorType).includes(val.type)
+  );
 }
 
 function isFunctionOperator(val: unknown | undefined): val is FunctionOperator {
-  // @ts-ignore
-  return Boolean(val) && "type" in val && val.type === OperatorType.Function;
+  return (
+    val !== null &&
+    val !== undefined &&
+    typeof val === "object" &&
+    "type" in val &&
+    // @ts-ignore
+    val["type"] === OperatorType.Function
+  );
 }

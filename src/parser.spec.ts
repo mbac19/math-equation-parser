@@ -286,95 +286,86 @@ describe("Parser", () => {
       );
     });
 
-    //   it("parses with highest precedence with binary operators", () => {
-    //     const parser = new Parser();
-    //     parser.addOperator({
-    //       type: OperatorType.Unary,
-    //       name: "Blah",
-    //       symbol: "$",
-    //     });
-    //     expect(parser.parse("$1 + 2")).toEqual({
-    //       type: OperatorType.Binary,
-    //       name: "Sum",
-    //       left: {
-    //         type: OperatorType.Unary,
-    //         name: "Blah",
-    //         param: [makeLiteralNode(1)],
-    //       },
-    //       right: makeLiteralNode(2),
-    //     });
-    //     expect(parser.parse("1 + $2")).toEqual({
-    //       type: "BinaryOperator",
-    //       name: "Sum",
-    //       left: Literal(1),
-    //       right: {
-    //         type: "UnaryOperator",
-    //         name: "Blah",
-    //         param: Literal(2),
-    //       },
-    //     });
-    //     expect(parser.parse("$1 + 2 * 3")).toEqual({
-    //       type: "BinaryOperator",
-    //       name: "Sum",
-    //       left: {
-    //         type: "UnaryOperator",
-    //         name: "Blah",
-    //         param: Literal(1),
-    //       },
-    //       right: {
-    //         type: "BinaryOperator",
-    //         name: "Product",
-    //         left: Literal(2),
-    //         right: Literal(3),
-    //       },
-    //     });
-    //   });
-    //   it("parses with more complicated math statements nested inside", () => {
-    //     const parser = new Parser();
-    //     parser.addOperatorPayload({
-    //       type: "UnaryOperator",
-    //       name: "Blah",
-    //       symbol: "$",
-    //     });
-    //     expect(parser.parse("$(1 + 2sin(x))")).toEqual({
-    //       type: "UnaryOperator",
-    //       name: "Blah",
-    //       param: {
-    //         type: "BinaryOperator",
-    //         name: "Sum",
-    //         left: Literal(1),
-    //         right: {
-    //           type: "BinaryOperator",
-    //           name: "Product",
-    //           left: Literal(2),
-    //           right: {
-    //             type: "FunctionOperator",
-    //             name: "Sine",
-    //             params: [Variable("x")],
-    //           },
-    //         },
-    //       },
-    //     });
-    //   });
-    //   it("parses with implicit multiplication", () => {
-    //     const parser = new Parser();
-    //     parser.addOperatorPayload({
-    //       type: "UnaryOperator",
-    //       name: "Blah",
-    //       symbol: "$",
-    //     });
-    //     expect(parser.parse("2$1")).toEqual({
-    //       type: "BinaryOperator",
-    //       name: "Product",
-    //       left: Literal(2),
-    //       right: {
-    //         type: "UnaryOperator",
-    //         name: "Blah",
-    //         param: Literal(1),
-    //       },
-    //     });
-    //   });
+    it("parses with highest precedence with binary operators", () => {
+      const parser = new Parser();
+
+      const $: Operator = {
+        type: OperatorType.Unary,
+        name: "Blah",
+        symbol: "$",
+      };
+
+      parser.addOperator($);
+
+      expect(parser.parse("$1 + 2")).toEqual(
+        makeOperatorNode(CoreOperators.sum, [
+          makeOperatorNode($, [makeLiteralNode(1)]),
+          makeLiteralNode(2),
+        ])
+      );
+
+      expect(parser.parse("1 + $2")).toEqual(
+        makeOperatorNode(CoreOperators.sum, [
+          makeLiteralNode(1),
+          makeOperatorNode($, [makeLiteralNode(2)]),
+        ])
+      );
+
+      expect(parser.parse("$1 + 2 * 3")).toEqual(
+        makeOperatorNode(CoreOperators.sum, [
+          makeOperatorNode($, [makeLiteralNode(1)]),
+          makeOperatorNode(CoreOperators.prod, [
+            makeLiteralNode(2),
+            makeLiteralNode(3),
+          ]),
+        ])
+      );
+    });
+
+    it("parses with more complicated math statements nested inside", () => {
+      const parser = new Parser();
+
+      const $: Operator = {
+        type: OperatorType.Unary,
+        name: "Blah",
+        symbol: "$",
+      };
+
+      parser.addOperator($);
+
+      expect(parser.parse("$(1 + 2sin(x))")).toEqual(
+        makeOperatorNode($, [
+          makeOperatorNode(CoreOperators.sum, [
+            makeLiteralNode(1),
+            makeOperatorNode(CoreOperators.prod, [
+              makeLiteralNode(2),
+              makeOperatorNode(CoreOperators.sin, [makeVariableNode("x")]),
+            ]),
+          ]),
+        ])
+      );
+    });
+
+    it("parses with implicit multiplication", () => {
+      const parser = new Parser();
+
+      const $: Operator = {
+        type: OperatorType.Unary,
+        name: "Blah",
+        symbol: "$",
+      };
+
+      parser.addOperator($);
+
+      expect(parser.parse("2$1")).toEqual(
+        makeOperatorNode(CoreOperators.prod, [
+          makeLiteralNode(2),
+          makeOperatorNode($, [makeLiteralNode(1)]),
+        ])
+      );
+    });
   });
+
   // it("parses the unary minus operator", () => {
   //   expect(Parser.parse("-3")).toEqual({
   //     type: "UnaryOperator",

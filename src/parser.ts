@@ -1,4 +1,4 @@
-import { assert, MathSyntaxError } from "./error_utils";
+import { CloseSymbol, OperatorProcessor } from "./operator_processor";
 import {
   BinaryOperator,
   FunctionOperator,
@@ -13,19 +13,8 @@ import {
   getOperatorClaimToken,
   getVariableClaimToken,
 } from "./get_claim_token";
-import { MathASTNode } from "./math_ast";
-import { CloseSymbol, OperatorProcessor } from "./operator_processor";
-import { makeVariableNode } from ".";
-
-/**
- * The unary minus operator is a special operator. We keep it separate from
- * other operators and the parser will need to reference it directly.
- */
-const UnaryMinusOperator: UnaryOperator = {
-  type: OperatorType.Unary,
-  name: "Minus",
-  symbol: "-",
-};
+import { makeVariableNode, MathASTNode } from "./math_ast";
+import { MathSyntaxError } from "./error_utils";
 
 export class Parser {
   private readonly def: ParserDef;
@@ -54,7 +43,12 @@ export class Parser {
           break;
 
         case OperatorType.Unary:
-          unaryOperators.push(operator);
+          // NOTE: We are treating the unary minus as a special case and not
+          // processing it with the other unary operators. This is because
+          // it must be disambiguated from the binary minus.
+          if (operator !== CoreOperators.unaryMinus) {
+            unaryOperators.push(operator);
+          }
           break;
 
         case OperatorType.Function:
@@ -142,7 +136,7 @@ export class Parser {
 
       // Check for the unary minus operator.
       const unaryMinusClaimToken = getOperatorClaimToken(
-        UnaryMinusOperator,
+        CoreOperators.unaryMinus,
         textToProcess
       );
 
@@ -150,7 +144,7 @@ export class Parser {
         unaryMinusClaimToken !== undefined &&
         processor.shouldProcessMinusAsUnary()
       ) {
-        processor.addOperator(UnaryMinusOperator);
+        processor.addOperator(CoreOperators.unaryMinus);
         textToProcess = unaryMinusClaimToken.remainder;
         continue;
       }

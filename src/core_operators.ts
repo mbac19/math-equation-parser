@@ -63,4 +63,10 @@ export const CoreOperators: Record<string, Operator> = {
     name: "Tangent",
     symbol: "tan",
   },
+
+  unaryMinus: {
+    type: OperatorType.Unary,
+    name: "Minus",
+    symbol: "-",
+  },
 };

@@ -9,8 +9,8 @@ const FloatingPointNumberRegExp = /(^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)/;
  * something that can be used to create an AST node.
  */
 export interface ClaimToken {
-  claim: string;
-  remainder: string;
+  start: number;
+  end: number;
 }
 
 /**
@@ -18,14 +18,19 @@ export interface ClaimToken {
  * Returns the claim token if we were able to parse a literal,
  * otherwise undefined.
  */
-export function getLiteralClaimToken(text: string): ClaimToken | undefined {
-  const match = text.match(FloatingPointNumberRegExp);
+export function getLiteralClaimToken(
+  text: string,
+  pointer: number
+): ClaimToken | undefined {
+  const subtext = text.slice(pointer);
+
+  const match = subtext.match(FloatingPointNumberRegExp);
 
   if (!match) {
     return;
   }
 
-  return { claim: match[0], remainder: text.slice(match[0].length) };
+  return { start: pointer, end: pointer + match[0].length };
 }
 
 /**
@@ -34,16 +39,20 @@ export function getLiteralClaimToken(text: string): ClaimToken | undefined {
  */
 export function getVariableClaimToken(
   validVariables: Array<string> | undefined,
-  text: string
+  text: string,
+  pointer: number
 ): ClaimToken | undefined {
-  if (!/^[a-zA-Z]/.test(text)) {
+  const subtext = text.slice(pointer);
+
+  if (!/^[a-zA-Z]/.test(subtext)) {
     return;
   }
 
-  if (validVariables && validVariables.indexOf(text.charAt(0)) < 0) {
+  if (validVariables && validVariables.indexOf(subtext.charAt(0)) < 0) {
     return;
   }
-  return { claim: text.charAt(0), remainder: text.slice(1) };
+
+  return { start: pointer, end: pointer + 1 };
 }
 
 /**
@@ -52,31 +61,49 @@ export function getVariableClaimToken(
  */
 export function getOperatorClaimToken(
   operator: Operator,
-  text: string
+  text: string,
+  pointer: number
 ): ClaimToken | undefined {
+  const subtext = text.slice(pointer);
+
   switch (operator.type) {
     case OperatorType.Unary: {
       const { symbol } = operator;
-      if (text.startsWith(symbol)) {
-        return { claim: symbol, remainder: text.slice(symbol.length) };
+      if (subtext.startsWith(symbol)) {
+        return { start: pointer, end: pointer + symbol.length };
       }
       return;
     }
 
     case OperatorType.Binary: {
       const { symbol } = operator;
-      if (text.startsWith(symbol)) {
-        return { claim: symbol, remainder: text.slice(symbol.length) };
+      if (subtext.startsWith(symbol)) {
+        return { start: pointer, end: pointer + symbol.length };
       }
       return;
     }
 
     case OperatorType.Function: {
       const { symbol } = operator;
-      if (text.startsWith(symbol)) {
-        return { claim: symbol, remainder: text.slice(symbol.length) };
+      if (subtext.startsWith(symbol)) {
+        return { start: pointer, end: pointer + symbol.length };
       }
       return;
     }
   }
+}
+
+export function getWhitespaceClaimToken(
+  text: string,
+  pointer: number
+): ClaimToken | undefined {
+  const subtext = text.slice(pointer);
+
+  const match = subtext.match(/^\s+/);
+
+  if (!match) {
+    return;
+  }
+
+  return { start: pointer, end: match[0].length + pointer };
 }
